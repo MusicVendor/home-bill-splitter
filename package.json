@@ -14,5 +14,8 @@
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
     "concurrently": "^10.0.6"
+  },
+  "volta": {
+    "node": "22.23.5"
   }
 }
