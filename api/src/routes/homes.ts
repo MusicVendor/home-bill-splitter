@@ -114,4 +114,129 @@ route.post('/:homeId/members', async (c) => {
   )
 })
 
+route.post('/:homeId/bills', async (c) => {
+  const homeId = c.req.param('homeId')
+  const homeIdNumber = Number(homeId)
+  const body = await c.req.json<{ title?: unknown; totalCents?: unknown }>()
+
+  if (!Number.isInteger(homeIdNumber) || homeIdNumber <= 0) {
+    return c.json({ error: 'Home not found' }, 404)
+  }
+
+  if (typeof body.title !== 'string' || body.title.trim() === '') {
+    return c.json({ error: 'Invalid bill title' }, 422)
+  }
+
+  if (
+    typeof body.totalCents !== 'number' ||
+    !Number.isInteger(body.totalCents) ||
+    body.totalCents <= 0
+  ) {
+    return c.json({ error: 'Invalid bill total' }, 422)
+  }
+
+  const title = body.title.trim()
+  const totalCents = body.totalCents
+
+  const home = await c.env.DB.prepare('SELECT id FROM homes WHERE id = ?')
+    .bind(homeIdNumber)
+    .first<{ id: number }>()
+
+  if (!home) {
+    return c.json(
+      {
+        error: 'Home not found',
+      },
+      404,
+    )
+  }
+
+  const membersResult = await c.env.DB.prepare(`
+                                SELECT id, name, position
+                                FROM members
+                                WHERE home_id = ?
+                                ORDER BY position ASC
+                            `)
+    .bind(homeIdNumber)
+    .all<{
+      id: number
+      name: string
+      position: number
+    }>()
+
+  const members = membersResult.results
+
+  if (members.length === 0) {
+    return c.json(
+      {
+        error: 'Home has no members',
+      },
+      422,
+    )
+  }
+
+  const shareCents = Math.floor(totalCents / members.length)
+  const remainder = totalCents % members.length
+
+  const calculatedShares = members.map((member, index) => ({
+    memberId: member.id,
+    amountCents: shareCents + (index < remainder ? 1 : 0),
+  }))
+
+  const bill = await c.env.DB.prepare(`
+        INSERT INTO bills (home_id, title, total_cents)
+        VALUES (?, ?, ?)
+        RETURNING id, home_id, title, total_cents
+    `)
+    .bind(homeIdNumber, title, totalCents)
+    .first<{ id: number; home_id: number; title: string; total_cents: number }>()
+
+  if (!bill) {
+    return c.json(
+      {
+        error: 'Failed to create bill',
+      },
+      500,
+    )
+  }
+
+  const billQuery = calculatedShares.map((share) =>
+    c.env.DB.prepare(
+      `
+        INSERT INTO shares (bill_id, member_id, amount_cents)
+        VALUES (?, ?, ?)
+        RETURNING id, member_id, amount_cents, paid_at
+      `,
+    ).bind(bill.id, share.memberId, share.amountCents),
+  )
+
+  const results = await c.env.DB.batch(billQuery)
+  const shares = results.map((result) => {
+    const share = result.results[0] as {
+      id: number
+      member_id: number
+      amount_cents: number
+      paid_at: string | null
+    }
+
+    return {
+      id: String(share.id),
+      memberId: String(share.member_id),
+      amountCents: share.amount_cents,
+      paidAt: share.paid_at,
+    }
+  })
+
+  return c.json(
+    {
+      id: String(bill.id),
+      homeId: String(bill.home_id),
+      title: bill.title,
+      totalCents: bill.total_cents,
+      shares,
+    },
+    201,
+  )
+})
+
 export { route as homesRoutes }

@@ -13,10 +13,10 @@ CREATE TABLE shares (
   id INTEGER PRIMARY KEY,
   bill_id INTEGER NOT NULL,
   member_id INTEGER NOT NULL,
-  amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+  amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
 
-  paid_at TEXT,
-  idempotency_key TEXT,
+  paid_at TEXT DEFAULT NULL,
+  idempotency_key TEXT DEFAULT NULL,
 
   FOREIGN KEY (bill_id)
     REFERENCES bills(id)
