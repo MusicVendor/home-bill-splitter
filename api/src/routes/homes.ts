@@ -239,33 +239,31 @@ route.post('/:homeId/bills', async (c) => {
   )
 })
 
-route.get(':homeId/balances', async (c) => {
+route.get('/:homeId/balances', async (c) => {
   const homeId = c.req.param('homeId')
   const homeIdNumber = Number(homeId)
 
   if (!Number.isInteger(homeIdNumber) || homeIdNumber <= 0) {
-    return c.json(
-      {
-        error: 'Home not found',
-      },
-      404,
-    )
+    return c.json({ 
+        error: 'Home not found' 
+    }, 
+    404)
   }
 
-  const home = await c.env.DB.prepare('SELECT id FROM homes WHERE id = ?')
+  const home = await c.env.DB
+    .prepare('SELECT id FROM homes WHERE id = ?')
     .bind(homeIdNumber)
     .first<{ id: number }>()
 
   if (!home) {
-    return c.json(
-      {
-        error: 'Home not found',
-      },
-      404,
-    )
+    return c.json({ 
+        error: 'Home not found' 
+    }, 
+    404)
   }
 
-  const result = await c.env.DB.prepare(`
+  const result = await c.env.DB
+    .prepare(`
       SELECT
         m.id,
         m.name,

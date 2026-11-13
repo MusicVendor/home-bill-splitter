@@ -107,6 +107,13 @@ route.post('/:billId/shares/:shareId/pay', async (c) => {
       409,
     )
   }
+
+  return c.json(
+    {
+      error: 'Failed to pay share',
+    },
+    500,
+  )
 })
 
 export { route as billsRoutes }
