@@ -13,6 +13,24 @@ When multiple requests add members to the same home concurrently, calculating th
 
 After creating a bill, all member shares are inserted using D1's `batch()` API rather than executing individual database calls one by one. This reduces database round trips and keeps the share creation logic grouped together, making the bill creation flow simpler and more efficient.
 
+## Database Constraints
+
+The database uses constraints to protect data integrity even if invalid data reaches the database layer.
+
+| Constraint | Purpose |
+|---|---|
+| `FOREIGN KEY (home_id)` on `members` | Ensures every member belongs to an existing home |
+| `CHECK (position > 0)` | Prevents invalid member positions |
+| `UNIQUE (home_id, position)` | Ensures two members in the same home cannot have the same position |
+| `FOREIGN KEY (home_id)` on `bills` | Ensures every bill belongs to an existing home |
+| `CHECK (total_cents > 0)` | Prevents bills with zero or negative totals |
+| `FOREIGN KEY (bill_id)` on `shares` | Ensures every share belongs to an existing bill |
+| `FOREIGN KEY (member_id)` on `shares` | Ensures every share belongs to an existing member |
+| `CHECK (amount_cents >= 0)` | Prevents negative share amounts |
+| `UNIQUE (bill_id, member_id)` | Ensures a member receives only one share for a bill |
+
+The `UNIQUE (home_id, position)` constraint also supports the concurrency handling in the member creation flow. If concurrent requests temporarily conflict while assigning a position, the application retries the operation so a valid request can obtain the next available position.
+
 # SDE Intern Assignment: Shared Bill Splitter
 
 Welcome. In this assignment you build a small bill splitter for a shared home. It has two parts:
