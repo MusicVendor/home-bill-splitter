@@ -1,3 +1,18 @@
+## Decisions
+
+### 1. Four-table database schema with ordered members [Crucial Assumption, currently no memeber belongs to more than one home]
+
+I used four tables schema: `homes`, `members`, `bills`, and `shares`. A member belongs to one home, and each member has a `position` value to preserve the order in which members were added. This was important because any remainder while splitting a bill is assigned to the first members in insertion order. 
+If the system needed to support members belonging to more than one home, I will move to 5 table schema where we will add a table `home_members` that will store a home and members belonging to those homes.
+
+### 2. Retry-based concurrency handling for adding members
+
+When multiple requests add members to the same home concurrently, calculating the next position can cause a unique constraint conflict. The members table has a unique constraint on (home_id, position) to ensure that two members cannot have the same position within a home. These conflict are managed by a retry mechanism that allows a valid request to have max of 3 attmepts to obtain the next available position instead of failing immediately due to a temporary concurrency conflict.
+
+### 3. Batch creation of bill shares
+
+After creating a bill, all member shares are inserted using D1's `batch()` API rather than executing individual database calls one by one. This reduces database round trips and keeps the share creation logic grouped together, making the bill creation flow simpler and more efficient.
+
 # SDE Intern Assignment: Shared Bill Splitter
 
 Welcome. In this assignment you build a small bill splitter for a shared home. It has two parts:
